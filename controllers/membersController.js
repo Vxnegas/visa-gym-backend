@@ -1,4 +1,5 @@
 const db = require('../database/db');
+const { enviarCorreoNotificacion } = require('../services/emailService');
 
 async function listar(req, res, next) {
   try {
@@ -70,10 +71,11 @@ async function crear(req, res, next) {
     const miembro = rows[0];
 
     // Encolar notificación de bienvenida (deduplicada por miembro)
-    await db.query(
+    const { rows: notifRows } = await db.query(
       `INSERT INTO notificaciones (miembro_id, tipo, asunto, mensaje, estado, clave_deduplicacion)
        VALUES ($1, 'bienvenida', $2, $3, 'pendiente', $4)
-       ON CONFLICT (clave_deduplicacion) DO NOTHING`,
+       ON CONFLICT (clave_deduplicacion) DO NOTHING
+       RETURNING *`,
       [
         miembro.id,
         `¡Bienvenido a VISA GYM, ${miembro.nombre}!`,
@@ -81,6 +83,13 @@ async function crear(req, res, next) {
         `bienvenida:${miembro.id}`,
       ]
     );
+
+    // Enviar el correo de bienvenida de inmediato (no esperar al revisor de cada 5 min)
+    if (notifRows[0]) {
+      enviarCorreoNotificacion(notifRows[0], miembro.email).catch((e) =>
+        console.error('Error enviando correo de bienvenida:', e.message)
+      );
+    }
 
     res.status(201).json(miembro);
   } catch (err) {
