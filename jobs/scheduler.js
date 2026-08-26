@@ -110,7 +110,8 @@ async function procesarProgramados() {
   const { rows: pendientes } = await db.query(`
     SELECT n.*, m.email AS miembro_email FROM notificaciones n
     JOIN miembros m ON m.id = n.miembro_id
-    WHERE n.estado = 'programado' AND n.fecha_programada <= now()
+    WHERE (n.estado = 'programado' AND n.fecha_programada <= now())
+       OR (n.estado = 'pendiente' AND n.fecha_programada IS NULL)
   `);
   for (const n of pendientes) {
     await enviarCorreoNotificacion(n, n.miembro_email).catch((e) => console.error('Error correo programado:', e.message));
